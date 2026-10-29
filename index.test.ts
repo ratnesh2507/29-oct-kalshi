@@ -64,3 +64,43 @@ test("If the username and password are correct, signin should return a 200", asy
 
   expect(res.status).toBe(200);
 });
+
+test("User should be able to onramp USD", async () => {
+  const username = `onramp-${Math.random()}`;
+  const password = "123456";
+
+  await axios.post(`${BACKEND_URL}/signup`, {
+    username,
+    password,
+  });
+
+  const response = await axios.post(`${BACKEND_URL}/onramp`, {
+    username,
+    amount: 100,
+  });
+
+  expect(response.status).toBe(200);
+  expect(response.data.balance).toBe(100);
+});
+
+test("User should be able to onramp multiple times", async () => {
+  const username = `onramp-multiple-${Math.random()}`;
+  const password = "123456";
+
+  await axios.post(`${BACKEND_URL}/signup`, {
+    username,
+    password,
+  });
+
+  await axios.post(`${BACKEND_URL}/onramp`, {
+    username,
+    amount: 100,
+  });
+  const response = await axios.post(`${BACKEND_URL}/onramp`, {
+    username,
+    amount: 50,
+  });
+
+  expect(response.status).toBe(200);
+  expect(response.data.balance).toBe(150);
+});
