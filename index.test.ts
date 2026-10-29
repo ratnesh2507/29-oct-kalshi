@@ -104,3 +104,46 @@ test("User should be able to onramp multiple times", async () => {
   expect(response.status).toBe(200);
   expect(response.data.balance).toBe(150);
 });
+
+test("User should be able to create market", async () => {
+  const username = `market-${Math.random()}`;
+  const password = "123456";
+
+  await axios.post(`${BACKEND_URL}/signup`, {
+    username,
+    password,
+  });
+
+  const signInResponse = await axios.post(`${BACKEND_URL}/signin`, {
+    username,
+    password,
+  });
+
+  const token = signInResponse.data.token;
+  const response = await axios.post(
+    `${BACKEND_URL}/market`,
+    {
+      title: "Will Trump win 2026 Elections?",
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  expect(response.status).toBe(200);
+  expect(response.data.title).toBe("Will Trump win 2026 Elections?");
+  expect(response.data.id).toBeDefined();
+});
+
+test("User should not be able to create a market without being authenticated", async () => {
+  try {
+    await axios.post(`${BACKEND_URL}/market`, {
+      title: "Will Trump win 2026 Elections?",
+    });
+    expect.fail();
+  } catch (e) {
+    expect(e.status).toBe(401);
+  }
+});

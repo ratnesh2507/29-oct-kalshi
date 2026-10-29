@@ -1,8 +1,8 @@
 import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { SignupSchema } from "./types";
-import { UserModel } from "./schema";
+import { SigninSchema, SignupSchema } from "./types";
+import { UserModel, MarketModel } from "./schema";
 
 const app = express();
 
@@ -40,8 +40,15 @@ app.post("/signup", async (req, res) => {
 });
 
 app.post("/signin", async (req, res) => {
-  const { username, password } = req.body;
+  const { success, data } = SigninSchema.safeParse(req.body);
 
+  if (!success) {
+    return res.status(411).json({
+      message: "Incorrect inputs",
+    });
+  }
+
+  const { username, password } = data;
   const user = await UserModel.findOne({
     username,
   });
@@ -88,6 +95,27 @@ app.post("/onramp", async (req, res) => {
 
   return res.status(200).json({
     balance: user.usdBalance,
+  });
+});
+
+app.post("/market", async (req, res) => {
+  const { title } = req.body;
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) {
+    return res.status(401).json({
+      message: "Unauthorized",
+    });
+  }
+  const decoded = jwt.verify(token, "secret") as {
+    userId: string;
+  };
+  const market = await MarketModel.create({
+    title,
+    creatorId: decoded.userId,
+  });
+  return res.status(200).json({
+    id: market._id,
+    title: market.title,
   });
 });
 
