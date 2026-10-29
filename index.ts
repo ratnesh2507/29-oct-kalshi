@@ -72,4 +72,23 @@ app.post("/signin", async (req, res) => {
   });
 });
 
+app.post("/onramp", async (req, res) => {
+  const { username, amount } = req.body;
+  const user = await UserModel.findOne({
+    username,
+  });
+  if (!user) {
+    return res.status(404).json({
+      message: "User not found",
+    });
+  }
+  user.usdBalance += amount;
+
+  await user.save();
+
+  return res.status(200).json({
+    balance: user.usdBalance,
+  });
+});
+
 app.listen(3001);
