@@ -2,7 +2,7 @@ import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { SigninSchema, SignupSchema } from "./types";
-import { UserModel, MarketModel } from "./schema";
+import { UserModel, MarketModel, StockBalanceModel } from "./schema";
 
 const app = express();
 
@@ -116,6 +116,148 @@ app.post("/market", async (req, res) => {
   return res.status(200).json({
     id: market._id,
     title: market.title,
+  });
+});
+
+app.post("/split", async (req, res) => {
+  const { marketId, amount } = req.body;
+
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) {
+    return res.status(401).json({
+      message: "Unauthorized",
+    });
+  }
+  const decoded = jwt.verify(token, "secret") as {
+    userId: string;
+  };
+  const user = await UserModel.findById(decoded.userId);
+
+  if (!user) {
+    return res.status(404).json({
+      message: "User not found",
+    });
+  }
+  if (user.usdBalance < amount) {
+    return res.status(400).json({
+      message: "Insufficient balance",
+    });
+  }
+  const market = await MarketModel.findById(marketId);
+
+  if (!market) {
+    return res.status(404).json({
+      message: "Market not found",
+    });
+  }
+
+  user.usdBalance -= amount;
+  await user.save();
+
+  const yesBalance = await StockBalanceModel.findOne({
+    userId: user._id,
+    marketId,
+    type: "yes",
+  });
+  if (yesBalance) {
+    yesBalance.qty += amount;
+    await yesBalance.save();
+  } else {
+    await StockBalanceModel.create({
+      userId: user._id,
+      marketId,
+      type: "yes",
+      qty: amount,
+    });
+  }
+  const noBalance = await StockBalanceModel.findOne({
+    userId: user._id,
+    marketId,
+    type: "no",
+  });
+  if (noBalance) {
+    noBalance.qty += amount;
+    await noBalance.save();
+  } else {
+    await StockBalanceModel.create({
+      userId: user._id,
+      marketId,
+      type: "no",
+      qty: amount,
+    });
+  }
+  market.totalIssued += amount;
+  await market.save();
+
+  return res.status(200).json({
+    message: "Split successful",
+  });
+});
+
+app.post("/merge", async (req, res) => {
+  const { marketId, amount } = req.body;
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) {
+    return res.status(401).json({
+      message: "Unauthorized",
+    });
+  }
+  const decoded = jwt.verify(token, "secret") as {
+    userId: string;
+  };
+
+  const user = await UserModel.findById(decoded.userId);
+
+  if (!user) {
+    return res.status(404).json({
+      message: "User not found",
+    });
+  }
+
+  const market = await MarketModel.findById(marketId);
+
+  if (!market) {
+    return res.status(404).json({
+      message: "Market not found",
+    });
+  }
+
+  const yesBalance = await StockBalanceModel.findOne({
+    userId: user._id,
+    marketId,
+    type: "yes",
+  });
+
+  if (!yesBalance || yesBalance.qty < amount) {
+    return res.status(400).json({
+      message: "Insufficient YES balance",
+    });
+  }
+  const noBalance = await StockBalanceModel.findOne({
+    userId: user._id,
+    marketId,
+    type: "no",
+  });
+
+  if (!noBalance || noBalance.qty < amount) {
+    return res.status(400).json({
+      message: "Insufficient NO balance",
+    });
+  }
+
+  yesBalance.qty -= amount;
+  noBalance.qty -= amount;
+
+  user.usdBalance += amount;
+  market.totalIssued -= amount;
+
+  await user.save();
+  await market.save();
+  await yesBalance.save();
+  await noBalance.save();
+
+  return res.status(200).json({
+    message: "Merge successful",
   });
 });
 
