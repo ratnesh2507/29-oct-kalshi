@@ -1,5 +1,6 @@
 import { test, expect } from "bun:test";
 import axios from "axios";
+import { UserModel, MarketModel, StockBalanceModel } from "./schema";
 
 const BACKEND_URL = "http://localhost:3001";
 
@@ -178,4 +179,158 @@ test("User should be able to get all markets", async () => {
   expect(response.status).toBe(200);
   expect(response.data.markets).toBeDefined();
   expect(response.data.markets.length).toBeGreaterThan(0);
+});
+
+test("User should be able to split USD into YES and NO stocks", async () => {
+  const username = `markets-${Math.random()}`;
+  const password = "123456";
+  await axios.post(`${BACKEND_URL}/signup`, {
+    username,
+    password,
+  });
+
+  const signInResponse = await axios.post(`${BACKEND_URL}/signin`, {
+    username,
+    password,
+  });
+
+  const token = signInResponse.data.token;
+  await axios.post(`${BACKEND_URL}/onramp`, {
+    username,
+    amount: 100,
+  });
+  const marketResponse = await axios.post(
+    `${BACKEND_URL}/market`,
+    {
+      title: "Will Trump win 2026 Elections?",
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+  const marketId = marketResponse.data.id;
+  const response = await axios.post(
+    `${BACKEND_URL}/split`,
+    {
+      marketId,
+      amount: 100,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+  expect(response.status).toBe(200);
+
+  const user = await UserModel.findOne({
+    username,
+  });
+
+  expect(user?.usdBalance).toBe(0);
+
+  const yesBalance = await StockBalanceModel.findOne({
+    userId: user?._id,
+    marketId,
+    type: "yes",
+  });
+
+  const noBalance = await StockBalanceModel.findOne({
+    userId: user?._id,
+    marketId,
+    type: "no",
+  });
+
+  expect(yesBalance?.qty).toBe(100);
+  expect(noBalance?.qty).toBe(100);
+
+  const market = await MarketModel.findById(marketId);
+
+  expect(market?.totalIssued).toBe(100);
+});
+
+test("User should be able to merge YES and NO stocks back into USD", async () => {
+  const username = `merge-${Math.random()}`;
+  const password = "123456";
+
+  await axios.post(`${BACKEND_URL}/signup`, {
+    username,
+    password,
+  });
+
+  const signInResponse = await axios.post(`${BACKEND_URL}/signin`, {
+    username,
+    password,
+  });
+
+  const token = signInResponse.data.token;
+
+  await axios.post(`${BACKEND_URL}/onramp`, {
+    username,
+    amount: 100,
+  });
+
+  const marketResponse = await axios.post(
+    `${BACKEND_URL}/market`,
+    {
+      title: "Will Trump win 2026 Elections?",
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  const marketId = marketResponse.data.id;
+
+  await axios.post(
+    `${BACKEND_URL}/split`,
+    {
+      marketId,
+      amount: 100,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  const response = await axios.post(
+    `${BACKEND_URL}/merge`,
+    {
+      marketId,
+      amount: 40,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+  expect(response.status).toBe(200);
+
+  const user = await UserModel.findOne({
+    username,
+  });
+  expect(user?.usdBalance).toBe(40);
+
+  const yesBalance = await StockBalanceModel.findOne({
+    userId: user?._id,
+    marketId,
+    type: "yes",
+  });
+  const noBalance = await StockBalanceModel.findOne({
+    userId: user?._id,
+    marketId,
+    type: "no",
+  });
+  expect(yesBalance?.qty).toBe(60);
+  expect(noBalance?.qty).toBe(60);
+
+  const market = await MarketModel.findById(marketId);
+  expect(market?.totalIssued).toBe(60);
 });
