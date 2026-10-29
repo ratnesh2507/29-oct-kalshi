@@ -3,51 +3,64 @@ import axios from "axios";
 
 const BACKEND_URL = "http://localhost:3001";
 
-const USERNAME = `harkirat-${Math.random()}`
+const USERNAME = `harkirat-${Math.random()}`;
 
 test("If username is small, the signup endpoint should return a 411 status code", async () => {
-    try {
-        const response = await axios.post(`${BACKEND_URL}/signup`, {
-            username: "a",
-            password: "asdasdadskjadskj"
-        })
+  try {
+    const response = await axios.post(`${BACKEND_URL}/signup`, {
+      username: "a",
+      password: "asdasdadskjadskj",
+    });
 
-        expect.fail()
-    } catch(e) {
-        console.log(e.status)
-        expect(e.status).toBe(411);
-    }    
-})
-
+    expect.fail();
+  } catch (e) {
+    console.log(e.status);
+    expect(e.status).toBe(411);
+  }
+});
 
 test("If the username and pasword are not present it should return a 411", async () => {
-    try {
-        const response = await axios.post(`${BACKEND_URL}/signup`, {
-        })
+  try {
+    const response = await axios.post(`${BACKEND_URL}/signup`, {});
 
-        expect.fail()
-    } catch(e) {
-        console.log(e.status)
-        expect(e.status).toBe(411);
-    }    
-})
-
+    expect.fail();
+  } catch (e) {
+    console.log(e.status);
+    expect(e.status).toBe(411);
+  }
+});
 
 test("If the username and pasword are not present it should return a 412", async () => {
-    const res = await axios.post(`${BACKEND_URL}/signup`, {
-        username: USERNAME,
-        password: "123123"
-    })
-    expect(res.status).toBe(200);
+  const res = await axios.post(`${BACKEND_URL}/signup`, {
+    username: USERNAME,
+    password: "123123",
+  });
+  expect(res.status).toBe(200);
 
-    try {
-        await axios.post(`${BACKEND_URL}/signup`, {
-            username: USERNAME,
-            password: "123123"
-        })  
-    } catch(e) {
-        console.log(e.status)
-        expect(e.status).toBe(412);
-    }    
+  try {
+    await axios.post(`${BACKEND_URL}/signup`, {
+      username: USERNAME,
+      password: "123123",
+    });
+  } catch (e) {
+    console.log(e.status);
+    expect(e.status).toBe(412);
+  }
+});
 
-})
+test("If the username and password are correct, signin should return a 200", async () => {
+  const username = `signin-${Math.random()}`;
+  const password = "123456";
+
+  await axios.post(`${BACKEND_URL}/signup`, {
+    username,
+    password,
+  });
+
+  const res = await axios.post(`${BACKEND_URL}/signin`, {
+    username,
+    password,
+  });
+
+  expect(res.status).toBe(200);
+});
