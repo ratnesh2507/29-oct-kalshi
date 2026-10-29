@@ -119,4 +119,11 @@ app.post("/market", async (req, res) => {
   });
 });
 
+app.get("/markets", async (req, res) => {
+  const markets = await MarketModel.find();
+  return res.status(200).json({
+    markets,
+  });
+});
+
 app.listen(3001);

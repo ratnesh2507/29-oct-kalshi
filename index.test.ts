@@ -147,3 +147,35 @@ test("User should not be able to create a market without being authenticated", a
     expect(e.status).toBe(401);
   }
 });
+
+test("User should be able to get all markets", async () => {
+  const username = `markets-${Math.random()}`;
+  const password = "123456";
+  await axios.post(`${BACKEND_URL}/signup`, {
+    username,
+    password,
+  });
+
+  const signInResponse = await axios.post(`${BACKEND_URL}/signin`, {
+    username,
+    password,
+  });
+
+  const token = signInResponse.data.token;
+  await axios.post(
+    `${BACKEND_URL}/market`,
+    {
+      title: "Will Trump win 2026 Elections?",
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+  const response = await axios.get(`${BACKEND_URL}/markets`);
+
+  expect(response.status).toBe(200);
+  expect(response.data.markets).toBeDefined();
+  expect(response.data.markets.length).toBeGreaterThan(0);
+});
