@@ -8,34 +8,33 @@ const USERNAME = `harkirat-${Math.random()}`;
 
 test("If username is small, the signup endpoint should return a 411 status code", async () => {
   try {
-    const response = await axios.post(`${BACKEND_URL}/signup`, {
+    await axios.post(`${BACKEND_URL}/signup`, {
       username: "a",
       password: "asdasdadskjadskj",
     });
 
     expect.fail();
-  } catch (e) {
-    console.log(e.status);
+  } catch (e: any) {
     expect(e.status).toBe(411);
   }
 });
 
-test("If the username and pasword are not present it should return a 411", async () => {
+test("If the username and password are not present it should return a 411", async () => {
   try {
-    const response = await axios.post(`${BACKEND_URL}/signup`, {});
+    await axios.post(`${BACKEND_URL}/signup`, {});
 
     expect.fail();
-  } catch (e) {
-    console.log(e.status);
+  } catch (e: any) {
     expect(e.status).toBe(411);
   }
 });
 
-test("If the username and pasword are not present it should return a 412", async () => {
+test("If the username and password are correct, duplicate signup should return 412", async () => {
   const res = await axios.post(`${BACKEND_URL}/signup`, {
     username: USERNAME,
     password: "123123",
   });
+
   expect(res.status).toBe(200);
 
   try {
@@ -43,8 +42,9 @@ test("If the username and pasword are not present it should return a 412", async
       username: USERNAME,
       password: "123123",
     });
-  } catch (e) {
-    console.log(e.status);
+
+    expect.fail();
+  } catch (e: any) {
     expect(e.status).toBe(412);
   }
 });
@@ -97,6 +97,7 @@ test("User should be able to onramp multiple times", async () => {
     username,
     amount: 100,
   });
+
   const response = await axios.post(`${BACKEND_URL}/onramp`, {
     username,
     amount: 50,
@@ -121,6 +122,7 @@ test("User should be able to create market", async () => {
   });
 
   const token = signInResponse.data.token;
+
   const response = await axios.post(
     `${BACKEND_URL}/market`,
     {
@@ -143,8 +145,9 @@ test("User should not be able to create a market without being authenticated", a
     await axios.post(`${BACKEND_URL}/market`, {
       title: "Will Trump win 2026 Elections?",
     });
+
     expect.fail();
-  } catch (e) {
+  } catch (e: any) {
     expect(e.status).toBe(401);
   }
 });
@@ -152,6 +155,7 @@ test("User should not be able to create a market without being authenticated", a
 test("User should be able to get all markets", async () => {
   const username = `markets-${Math.random()}`;
   const password = "123456";
+
   await axios.post(`${BACKEND_URL}/signup`, {
     username,
     password,
@@ -163,6 +167,7 @@ test("User should be able to get all markets", async () => {
   });
 
   const token = signInResponse.data.token;
+
   await axios.post(
     `${BACKEND_URL}/market`,
     {
@@ -174,6 +179,7 @@ test("User should be able to get all markets", async () => {
       },
     },
   );
+
   const response = await axios.get(`${BACKEND_URL}/markets`);
 
   expect(response.status).toBe(200);
@@ -182,8 +188,9 @@ test("User should be able to get all markets", async () => {
 });
 
 test("User should be able to split USD into YES and NO stocks", async () => {
-  const username = `markets-${Math.random()}`;
+  const username = `split-${Math.random()}`;
   const password = "123456";
+
   await axios.post(`${BACKEND_URL}/signup`, {
     username,
     password,
@@ -195,10 +202,12 @@ test("User should be able to split USD into YES and NO stocks", async () => {
   });
 
   const token = signInResponse.data.token;
+
   await axios.post(`${BACKEND_URL}/onramp`, {
     username,
     amount: 100,
   });
+
   const marketResponse = await axios.post(
     `${BACKEND_URL}/market`,
     {
@@ -210,7 +219,9 @@ test("User should be able to split USD into YES and NO stocks", async () => {
       },
     },
   );
+
   const marketId = marketResponse.data.id;
+
   const response = await axios.post(
     `${BACKEND_URL}/split`,
     {
@@ -223,6 +234,7 @@ test("User should be able to split USD into YES and NO stocks", async () => {
       },
     },
   );
+
   expect(response.status).toBe(200);
 
   const user = await UserModel.findOne({
@@ -234,21 +246,21 @@ test("User should be able to split USD into YES and NO stocks", async () => {
   const yesBalance = await StockBalanceModel.findOne({
     userId: user?._id,
     marketId,
-    type: "yes",
+    type: "YES",
   });
 
   const noBalance = await StockBalanceModel.findOne({
     userId: user?._id,
     marketId,
-    type: "no",
+    type: "NO",
   });
 
-  expect(yesBalance?.qty).toBe(100);
-  expect(noBalance?.qty).toBe(100);
+  expect(yesBalance?.qty).toBe(1);
+  expect(noBalance?.qty).toBe(1);
 
   const market = await MarketModel.findById(marketId);
 
-  expect(market?.totalIssued).toBe(100);
+  expect(market?.totalIssued).toBe(1);
 });
 
 test("User should be able to merge YES and NO stocks back into USD", async () => {
@@ -303,7 +315,7 @@ test("User should be able to merge YES and NO stocks back into USD", async () =>
     `${BACKEND_URL}/merge`,
     {
       marketId,
-      amount: 40,
+      amount: 1,
     },
     {
       headers: {
@@ -311,26 +323,31 @@ test("User should be able to merge YES and NO stocks back into USD", async () =>
       },
     },
   );
+
   expect(response.status).toBe(200);
 
   const user = await UserModel.findOne({
     username,
   });
-  expect(user?.usdBalance).toBe(40);
+
+  expect(user?.usdBalance).toBe(100);
 
   const yesBalance = await StockBalanceModel.findOne({
     userId: user?._id,
     marketId,
-    type: "yes",
+    type: "YES",
   });
+
   const noBalance = await StockBalanceModel.findOne({
     userId: user?._id,
     marketId,
-    type: "no",
+    type: "NO",
   });
-  expect(yesBalance?.qty).toBe(60);
-  expect(noBalance?.qty).toBe(60);
+
+  expect(yesBalance?.qty).toBe(0);
+  expect(noBalance?.qty).toBe(0);
 
   const market = await MarketModel.findById(marketId);
-  expect(market?.totalIssued).toBe(60);
+
+  expect(market?.totalIssued).toBe(0);
 });

@@ -25,8 +25,12 @@ const MarketSchema = new mongoose.Schema({
   creatorId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "users",
+    required: true,
   },
-  title: String,
+  title: {
+    type: String,
+    required: true,
+  },
   totalIssued: {
     type: Number,
     default: 0,
@@ -43,9 +47,16 @@ const OrderbookSchema = new mongoose.Schema({
   marketId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "markets",
+    required: true,
   },
-  type: String,
+  type: {
+    type: String,
+    enum: ["YES", "NO"],
+    required: true,
+  },
 });
+
+OrderbookSchema.index({ marketId: 1, type: 1 }, { unique: true });
 
 export const OrderbookModel = mongoose.model("orderbooks", OrderbookSchema);
 
@@ -53,12 +64,18 @@ const StockBalanceSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "users",
+    required: true,
   },
   marketId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "markets",
+    required: true,
   },
-  type: String,
+  type: {
+    type: String,
+    enum: ["YES", "NO"],
+    required: true,
+  },
   qty: {
     type: Number,
     default: 0,
@@ -69,55 +86,128 @@ const StockBalanceSchema = new mongoose.Schema({
   },
 });
 
+StockBalanceSchema.index({ userId: 1, marketId: 1, type: 1 }, { unique: true });
+
 export const StockBalanceModel = mongoose.model(
   "stockBalances",
   StockBalanceSchema,
 );
 
-const BidSchema = new mongoose.Schema({
-  orderbookId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "orderbooks",
+const BidSchema = new mongoose.Schema(
+  {
+    orderbookId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "orderbooks",
+      required: true,
+    },
+    price: {
+      type: Number,
+      required: true,
+    },
+    qty: {
+      type: Number,
+      required: true,
+    },
+    remainingQty: {
+      type: Number,
+      required: true,
+    },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "users",
+      required: true,
+    },
+    stockType: {
+      type: String,
+      enum: ["YES", "NO"],
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ["OPEN", "PARTIALLY_FILLED", "FILLED", "CANCELLED"],
+      default: "OPEN",
+    },
   },
-  price: Number,
-  qty: Number,
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "users",
-  },
-  stockType: String,
-});
+  { timestamps: true },
+);
 
 export const BidModel = mongoose.model("bids", BidSchema);
 
-const AskSchema = new mongoose.Schema({
-  orderbookId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "orderbooks",
+const AskSchema = new mongoose.Schema(
+  {
+    orderbookId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "orderbooks",
+      required: true,
+    },
+    price: {
+      type: Number,
+      required: true,
+    },
+    qty: {
+      type: Number,
+      required: true,
+    },
+    remainingQty: {
+      type: Number,
+      required: true,
+    },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "users",
+      required: true,
+    },
+    stockType: {
+      type: String,
+      enum: ["YES", "NO"],
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ["OPEN", "PARTIALLY_FILLED", "FILLED", "CANCELLED"],
+      default: "OPEN",
+    },
   },
-  price: Number,
-  qty: Number,
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "users",
-  },
-  stockType: String,
-});
+  { timestamps: true },
+);
 
 export const AskModel = mongoose.model("asks", AskSchema);
 
 const FillSchema = new mongoose.Schema({
+  tradeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+  },
+  orderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+  },
   orderbookId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "orderbooks",
+    required: true,
   },
-  price: Number,
-  qty: Number,
-  type: String,
-  isMaker: Boolean,
+  price: {
+    type: Number,
+    required: true,
+  },
+  qty: {
+    type: Number,
+    required: true,
+  },
+  type: {
+    type: String,
+    enum: ["BUY", "SELL"],
+    required: true,
+  },
+  isMaker: {
+    type: Boolean,
+    required: true,
+  },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "users",
+    required: true,
   },
 });
 
