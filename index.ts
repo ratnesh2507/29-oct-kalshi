@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { SigninSchema, SignupSchema } from "./types";
 import { UserModel, MarketModel, StockBalanceModel } from "./schema";
+import { auth } from "./middleware/authMiddleware";
 
 const app = express();
 
@@ -49,6 +50,7 @@ app.post("/signin", async (req, res) => {
   }
 
   const { username, password } = data;
+
   const user = await UserModel.findOne({
     username,
   });
@@ -81,14 +83,17 @@ app.post("/signin", async (req, res) => {
 
 app.post("/onramp", async (req, res) => {
   const { username, amount } = req.body;
+
   const user = await UserModel.findOne({
     username,
   });
+
   if (!user) {
     return res.status(404).json({
       message: "User not found",
     });
   }
+
   user.usdBalance += amount;
 
   await user.save();
@@ -98,51 +103,48 @@ app.post("/onramp", async (req, res) => {
   });
 });
 
-app.post("/market", async (req, res) => {
+app.post("/market", auth, async (req, res) => {
   const { title } = req.body;
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) {
-    return res.status(401).json({
-      message: "Unauthorized",
-    });
-  }
-  const decoded = jwt.verify(token, "secret") as {
-    userId: string;
-  };
+
   const market = await MarketModel.create({
     title,
-    creatorId: decoded.userId,
+    creatorId: req.userId,
   });
+
   return res.status(200).json({
     id: market._id,
     title: market.title,
   });
 });
 
-app.post("/split", async (req, res) => {
+app.post("/split", auth, async (req, res) => {
   const { marketId, amount } = req.body;
 
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) {
-    return res.status(401).json({
-      message: "Unauthorized",
+  if (
+    typeof amount !== "number" ||
+    !Number.isInteger(amount) ||
+    amount <= 0 ||
+    amount % 100 !== 0
+  ) {
+    return res.status(400).json({
+      message: "Amount must be a positive integer divisible by 100",
     });
   }
-  const decoded = jwt.verify(token, "secret") as {
-    userId: string;
-  };
-  const user = await UserModel.findById(decoded.userId);
+
+  const user = await UserModel.findById(req.userId);
 
   if (!user) {
     return res.status(404).json({
       message: "User not found",
     });
   }
+
   if (user.usdBalance < amount) {
     return res.status(400).json({
       message: "Insufficient balance",
     });
   }
+
   const market = await MarketModel.findById(marketId);
 
   if (!market) {
@@ -150,6 +152,8 @@ app.post("/split", async (req, res) => {
       message: "Market not found",
     });
   }
+
+  const qty = amount / 100;
 
   user.usdBalance -= amount;
   await user.save();
@@ -157,36 +161,40 @@ app.post("/split", async (req, res) => {
   const yesBalance = await StockBalanceModel.findOne({
     userId: user._id,
     marketId,
-    type: "yes",
+    type: "YES",
   });
+
   if (yesBalance) {
-    yesBalance.qty += amount;
+    yesBalance.qty += qty;
     await yesBalance.save();
   } else {
     await StockBalanceModel.create({
       userId: user._id,
       marketId,
-      type: "yes",
-      qty: amount,
+      type: "YES",
+      qty,
     });
   }
+
   const noBalance = await StockBalanceModel.findOne({
     userId: user._id,
     marketId,
-    type: "no",
+    type: "NO",
   });
+
   if (noBalance) {
-    noBalance.qty += amount;
+    noBalance.qty += qty;
     await noBalance.save();
   } else {
     await StockBalanceModel.create({
       userId: user._id,
       marketId,
-      type: "no",
-      qty: amount,
+      type: "NO",
+      qty,
     });
   }
-  market.totalIssued += amount;
+
+  market.totalIssued += qty;
   await market.save();
 
   return res.status(200).json({
@@ -194,19 +202,16 @@ app.post("/split", async (req, res) => {
   });
 });
 
-app.post("/merge", async (req, res) => {
+app.post("/merge", auth, async (req, res) => {
   const { marketId, amount } = req.body;
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) {
-    return res.status(401).json({
-      message: "Unauthorized",
+
+  if (typeof amount !== "number" || !Number.isInteger(amount) || amount <= 0) {
+    return res.status(400).json({
+      message: "Amount must be a positive integer",
     });
   }
-  const decoded = jwt.verify(token, "secret") as {
-    userId: string;
-  };
 
-  const user = await UserModel.findById(decoded.userId);
+  const user = await UserModel.findById(req.userId);
 
   if (!user) {
     return res.status(404).json({
@@ -225,7 +230,7 @@ app.post("/merge", async (req, res) => {
   const yesBalance = await StockBalanceModel.findOne({
     userId: user._id,
     marketId,
-    type: "yes",
+    type: "YES",
   });
 
   if (!yesBalance || yesBalance.qty < amount) {
@@ -233,10 +238,11 @@ app.post("/merge", async (req, res) => {
       message: "Insufficient YES balance",
     });
   }
+
   const noBalance = await StockBalanceModel.findOne({
     userId: user._id,
     marketId,
-    type: "no",
+    type: "NO",
   });
 
   if (!noBalance || noBalance.qty < amount) {
@@ -248,7 +254,7 @@ app.post("/merge", async (req, res) => {
   yesBalance.qty -= amount;
   noBalance.qty -= amount;
 
-  user.usdBalance += amount;
+  user.usdBalance += amount * 100;
   market.totalIssued -= amount;
 
   await user.save();
@@ -263,6 +269,7 @@ app.post("/merge", async (req, res) => {
 
 app.get("/markets", async (req, res) => {
   const markets = await MarketModel.find();
+
   return res.status(200).json({
     markets,
   });
